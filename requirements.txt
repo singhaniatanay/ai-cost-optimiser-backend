@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+pydantic>=2
+pydantic-settings
+openai>=1.17.0
+python-dotenv
+anyio
+pytest
+httpx 
