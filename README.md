@@ -1,257 +1,252 @@
-# Cost Architect: Backend for AI cost optimization
+# Cost Architect AI Backend
 
-Cost Architect is an enterprise-grade AI cost optimization platform that helps organizations analyze, compare, and optimize their AI model usage costs. Through a sophisticated multi-agent workflow, it provides data-driven recommendations for switching between AI models to maximize ROI while meeting performance requirements.
+A FastAPI-based cost optimization system for enterprise AI workloads. Helps enterprises make data-driven decisions about AI model selection through automated analysis and recommendations.
 
-## Features
+## 🚀 Features
 
-- **Multi-Agent Workflow**: Orchestrates 6 specialized agents for comprehensive cost analysis
-- **Model Comparison**: Evaluates models across cost, latency, and context window constraints
-- **ROI Analysis**: Calculates savings potential, ROI percentage, and payback periods
-- **Solution Architecture**: Automatically designs AI solutions from business requirements
-- **REST API**: Easy integration with existing systems via FastAPI
-- **Extensible**: Support for custom model catalogs and providers
+### Core Functionality
+- **Automated Cost Analysis**: Calculates monthly costs across multiple AI models
+- **Model Scoring**: Filters and ranks models by latency, context window, and composite scores
+- **ROI Analysis**: Shows savings, ROI percentage, and payback periods
+- **Business Context Understanding**: Processes natural language automation requests
 
-## Architecture
+### 🎛️ **NEW: Interactive Mode with Real-time Parameter Adjustment**
+- **Structured Data API**: Returns all intermediate calculations for UI integration
+- **Real-time Updates**: Modify parameters via sliders and get instant recalculations
+- **Smart Restart Logic**: Only recalculates affected downstream components
+- **Debounced Updates**: Optimized for smooth slider interactions
 
-The system follows a STEP 0-5 workflow:
+## 📊 Architecture
 
-1. **Solution Architect** - Extracts requirements and designs AI solutions
-2. **Intake & Clarifier** - Validates and structures workload parameters
-3. **Cost Engine** - Calculates monthly costs across model catalog
-4. **Model Scorer** - Ranks models by composite cost/latency score
-5. **ROI Calculator** - Computes financial impact and payback timeline
-6. **Recommendation Synthesizer** - Generates executive-ready recommendations
+The system uses a 6-agent pipeline:
 
-## Setup
+1. **Solution Architect** - Extracts automation requirements from natural language
+2. **Intake & Clarifier** - Validates workload parameters  
+3. **Cost Engine** - Calculates monthly costs across all models
+4. **Model Scorer** - Filters by constraints and ranks by composite score
+5. **ROI Calculator** - Compares current vs recommended model costs
+6. **Recommendation Synthesizer** - Generates executive-ready markdown reports
 
-### Prerequisites
+## 🔌 API Endpoints
 
-- Python 3.11+
-- pip or pipenv
+### Standard Chat Mode
+```http
+POST /v1/chat
+Content-Type: application/json
 
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd cost_architect
-   ```
-
-2. **Create virtual environment**
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-3. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   # OR using make
-   make install
-   ```
-
-4. **Environment setup**
-   ```bash
-   cp .env.example .env
-   # Edit .env and add your API keys
-   ```
-
-   Required environment variables:
-   ```bash
-   OPENAI_API_KEY=your_openai_api_key_here
-   MODEL_TIMEOUT_S=30
-   ```
-
-## Quick Start
-
-### Development Server
-
-```bash
-# Using make
-make dev
-
-# OR directly with uvicorn
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-The API will be available at `http://localhost:8000`
-
-- **API Documentation**: `http://localhost:8000/docs`
-- **Health Check**: `http://localhost:8000/healthz`
-
-### Docker
-
-```bash
-# Build image
-make docker-build
-
-# Run container
-make docker-run
-```
-
-## API Usage
-
-### Example Request
-
-```bash
-curl -X POST "http://localhost:8000/v1/chat" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "messages": [
-      {
-        "role": "user",
-        "content": "I need to optimize costs for processing 1000 customer support tickets per day. Each ticket has about 500 words of context and I need 200-word summaries. Response time should be under 2 seconds."
-      }
-    ]
-  }'
-```
-
-### Example Response
-
-```json
 {
-  "answer": "Switch from gpt-4o to gpt-3.5-turbo; save ₹36000 / month (ROI 80%, payback 4 weeks).\n\n| Model | Monthly Cost | Latency (ms) | Score |\n|-------|-------------|-------------|-------|\n| *gpt-3.5-turbo* | ₹9000 | 350 | 1.0 |\n| gpt-4o | ₹45000 | 500 | 5.6 |\n\n• Cost driver: output tokens"
+  "messages": [
+    {
+      "role": "user", 
+      "content": "We process 500 support emails daily, need AI to tag priority and draft replies"
+    }
+  ]
 }
 ```
 
-### Direct Workload JSON
+**Response**: Plain text recommendation
 
-For advanced usage, you can provide structured workload data:
+### 🎛️ Interactive Mode
+```http
+POST /v1/chat/interactive
+Content-Type: application/json
 
-```bash
-curl -X POST "http://localhost:8000/v1/chat" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "messages": [
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "We process 500 support emails daily, need AI to tag priority and draft replies"  
+    }
+  ]
+}
+```
+
+**Response**: Structured data with all intermediate outputs
+```json
+{
+  "structured_data": {
+    "solution_architect": {
+      "opt_task": "Email automation system",
+      "architecture": ["1 - Email ingestion", "2 - Priority classification", "3 - Response generation"],
+      "workload": {...}
+    },
+    "workload_params": {
+      "calls_per_day": 500,
+      "avg_input_tokens": 300,
+      "avg_output_tokens": 150,
+      "latency_sla_ms": 120000,
+      "region": "US",
+      "compliance_constraints": [],
+      "current_model": ""
+    },
+    "cost_table": [
       {
-        "role": "user", 
-        "content": "{\"calls_per_day\": 1000, \"avg_input_tokens\": 400, \"avg_output_tokens\": 150, \"latency_sla_ms\": 2000, \"region\": \"us-east-1\", \"compliance_constraints\": [], \"current_model\": \"gpt-4o\"}"
+        "model_name": "gpt-3.5-turbo",
+        "monthly_cost": 13500.0,
+        "p90_latency_ms": 350,
+        "context_window_tokens": 16385
       }
-    ]
-  }'
+    ],
+    "ranked_models": [
+      {
+        "model_name": "gpt-3.5-turbo", 
+        "monthly_cost": 13500.0,
+        "p90_latency_ms": 350,
+        "composite_score": 1.0
+      }
+    ],
+    "roi_analysis": {
+      "current_model": "",
+      "best_model": "gpt-3.5-turbo",
+      "savings_per_month": 0.0,
+      "roi_percent": 0.0,
+      "payback_weeks": 4
+    },
+    "final_recommendation": "Implement gpt-3.5-turbo; projected cost ₹13,500 / month...",
+    "editable_fields": ["calls_per_day", "avg_input_tokens", "avg_output_tokens", "latency_sla_ms", "region"]
+  }
+}
 ```
 
-## Testing
+### 🔄 Parameter Updates
+```http
+POST /v1/chat/update-params
+Content-Type: application/json
 
+{
+  "modified_workload": {
+    "calls_per_day": 1000,
+    "avg_input_tokens": 300,
+    "avg_output_tokens": 150,
+    "latency_sla_ms": 120000,
+    "region": "US",
+    "compliance_constraints": [],
+    "current_model": ""
+  },
+  "original_data": {
+    // Previous structured_data response
+  }
+}
+```
+
+**Response**: Updated structured data with recalculated costs and recommendations
+
+## 🎛️ Interactive UI Integration
+
+The interactive mode is designed for slider-based UIs:
+
+### UI Flow
+1. **Initial Analysis**: User describes automation need → Get structured data
+2. **Parameter Adjustment**: User moves sliders → Real-time cost updates
+3. **Visual Feedback**: Instant ROI recalculation and model re-ranking
+
+### Key UI Elements
+- **Volume Slider**: `calls_per_day` (100-5000)
+- **Input Tokens Slider**: `avg_input_tokens` (50-2000)  
+- **Output Tokens Slider**: `avg_output_tokens` (50-1000)
+- **Latency SLA Slider**: `latency_sla_ms` (1000ms-5min)
+- **Region Dropdown**: `region` (US, EU, APAC)
+
+### Optimization Features
+- **500ms Debouncing**: Prevents excessive API calls during slider movement
+- **Smart Restart**: Only recalculates from Cost Engine onwards (skips Solution Architect)
+- **Instant Visual Updates**: Slider values update immediately before API call
+
+## 🧪 Demo & Testing
+
+### Run Interactive Demo
 ```bash
-# Run all tests
-make test
+# Start the API server
+cd cost_architect
+python -m uvicorn app.main:app --reload --port 8000
 
-# Run with coverage
-make test-cov
+# Open the HTML demo
+open demo_ui.html
 
-# Run specific test file
-pytest tests/test_cost_math.py -v
+# Or run the Python simulation
+python example_ui_interaction.py
 ```
 
-## Development
-
+### Test Interactive Functionality
 ```bash
-# Code formatting
-make format
-
-# Linting
-make lint
-
-# Clean up
-make clean
+python test_interactive.py
 ```
 
-## Extending the System
+## 🏗️ Development
 
-### Adding Models to Cost Catalog
-
-Edit `cost_catalog.csv` to add new models:
-
-```csv
-model_name,price_per_1k_tokens,latency_ms,context_window_tokens
-claude-3-sonnet,15.0,400,200000
-gemini-pro,7.0,600,32000
-```
-
-### Swapping Model Providers
-
-1. **Create new adapter** in `app/adapters/`:
-   ```python
-   # app/adapters/anthropic_client.py
-   async def chat(prompt: str, model: str, temperature: float, top_p: float, timeout_s: int) -> str:
-       # Implement Anthropic API calls
-       pass
-   ```
-
-2. **Update agent configs** in `app/agents/configs.py`:
-   ```python
-   INTAKE_CLARIFIER = {
-       # ... existing config ...
-       "provider_id": "Anthropic",
-       "model": "claude-3-sonnet",
-       # ...
-   }
-   ```
-
-3. **Modify agents** to use new adapter:
-   ```python
-   # app/agents/intake.py
-   from app.adapters import anthropic_client  # instead of openai_client
-   ```
-
-### Custom Agent Implementation
-
-Create new agents by subclassing `BaseAgent`:
-
-```python
-from app.agents.base import BaseAgent
-
-class CustomAgent(BaseAgent):
-    async def run(self, message: Any) -> Any:
-        # Your custom logic here
-        return result
-```
-
-## Configuration
-
-Key configuration files:
-
-- `app/config.py` - Environment variables and settings
-- `app/agents/configs.py` - Agent prompts and model configurations
-- `cost_catalog.csv` - Model pricing and performance data
-- `requirements.txt` - Python dependencies
-
-## Deployment
-
-### Docker Production
-
+### Setup
 ```bash
-docker build -t cost-architect:prod .
-docker run -p 8000:8000 --env-file .env cost-architect:prod
+cd cost_architect
+pip install -r requirements.txt
+cp .env.example .env  # Add your OpenAI API key
 ```
+
+### Run Server
+```bash
+python -m uvicorn app.main:app --reload --port 8000
+```
+
+### Available Make Commands  
+```bash
+make dev     # Start development server
+make test    # Run tests
+make lint    # Check code quality
+make docker-build  # Build Docker image
+```
+
+## 🔧 Configuration
 
 ### Environment Variables
+```bash
+OPENAI_API_KEY=your_openai_api_key_here
+```
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `OPENAI_API_KEY` | OpenAI API key (required) | - |
-| `MODEL_TIMEOUT_S` | Request timeout in seconds | 30 |
+### Agent Configuration
+All agent prompts and settings are in `app/agents/configs.py`. Key settings:
+- **Temperature**: Set to 0.2 for consistent outputs
+- **Models**: All agents use `gpt-4o` for quality
+- **Response Format**: Structured JSON for machine processing
 
-## Contributing
+## 📈 Use Cases
+
+### Business Scenarios
+- **Customer Support**: Email/chat automation with priority tagging
+- **Document Processing**: Contract analysis, compliance review
+- **Sales Analytics**: Call summarization, lead scoring  
+- **Content Creation**: Blog posts, marketing copy generation
+- **Data Analysis**: Survey insights, report generation
+
+### Cost Optimization Benefits
+- **Multi-Model Comparison**: OpenAI, Anthropic, AWS Bedrock models
+- **Real-time What-if Analysis**: Adjust volume/requirements instantly
+- **ROI Visibility**: Clear payback periods and savings projections
+- **Constraint-aware Recommendations**: Respects latency and compliance needs
+
+## 🐳 Docker Deployment
+
+```bash
+# Build image
+docker build -t cost-architect .
+
+# Run container
+docker run -p 8000:8000 -e OPENAI_API_KEY=your_key cost-architect
+```
+
+## 📝 API Documentation
+
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
+- **Health Check**: http://localhost:8000/healthz
+
+## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Make changes with tests
-4. Run `make lint` and `make test`
-5. Submit a pull request
+2. Create feature branch (`git checkout -b feature/amazing-feature`)
+3. Make changes and test with `make test`
+4. Commit changes (`git commit -m 'Add amazing feature'`)
+5. Push to branch (`git push origin feature/amazing-feature`)
+6. Open Pull Request
 
-## License
+## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Support
-
-For issues and questions:
-- Create an issue on GitHub
-- Check the API documentation at `/docs`
-- Review test cases for usage examples
-
----
-
-**Cost Architect** - Optimize your AI costs with data-driven insights. 
+This project is licensed under the MIT License. 

@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cost Architect - Interactive Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f7;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .panel {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .slider-group {
+            margin: 15px 0;
+        }
+        .slider-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+        }
+        .slider {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #ddd;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #007AFF;
+            cursor: pointer;
+        }
+        .value-display {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .results {
+            margin-top: 20px;
+        }
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        .metric-label {
+            font-weight: 500;
+        }
+        .metric-value {
+            font-weight: 600;
+            color: #007AFF;
+        }
+        .model-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 8px 0;
+            background: #f9f9f9;
+        }
+        .model-name {
+            font-weight: 600;
+            color: #333;
+        }
+        .model-cost {
+            color: #007AFF;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .model-score {
+            color: #666;
+            font-size: 12px;
+        }
+        .loading {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+        }
+        h1, h2 {
+            color: #1d1d1f;
+        }
+        .initial-form {
+            margin-bottom: 20px;
+        }
+        .initial-form textarea {
+            width: 100%;
+            height: 100px;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-family: inherit;
+            resize: vertical;
+        }
+        .btn {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+        .btn:hover {
+            background: #0056b3;
+        }
+        .best-model {
+            border: 2px solid #007AFF;
+            background: #f0f8ff;
+        }
+    </style>
+</head>
+<body>
+    <h1>🏗️ Cost Architect - Interactive Demo</h1>
+    
+    <div class="initial-form">
+        <label for="userInput"><strong>Describe your AI automation need:</strong></label>
+        <textarea id="userInput" placeholder="Example: We process 500 support emails daily, need AI to tag priority and draft replies">We process 500 support emails daily, need AI to tag priority and draft replies</textarea>
+        <button class="btn" onclick="getInitialAnalysis()">Get Cost Analysis</button>
+    </div>
+
+    <div class="container" id="mainInterface" style="display: none;">
+        <!-- Parameter Controls -->
+        <div class="panel">
+            <h2>🎛️ Adjust Parameters</h2>
+            
+            <div class="slider-group">
+                <label for="callsPerDay">Calls per Day</label>
+                <input type="range" id="callsPerDay" class="slider" min="100" max="5000" step="100" value="500" oninput="updateParameter('calls_per_day', this.value)">
+                <div class="value-display" id="callsPerDayValue">500 calls/day</div>
+            </div>
+
+            <div class="slider-group">
+                <label for="inputTokens">Average Input Tokens</label>
+                <input type="range" id="inputTokens" class="slider" min="50" max="2000" step="50" value="300" oninput="updateParameter('avg_input_tokens', this.value)">
+                <div class="value-display" id="inputTokensValue">300 tokens</div>
+            </div>
+
+            <div class="slider-group">
+                <label for="outputTokens">Average Output Tokens</label>
+                <input type="range" id="outputTokens" class="slider" min="50" max="1000" step="25" value="150" oninput="updateParameter('avg_output_tokens', this.value)">
+                <div class="value-display" id="outputTokensValue">150 tokens</div>
+            </div>
+
+            <div class="slider-group">
+                <label for="latencySLA">Latency SLA (ms)</label>
+                <input type="range" id="latencySLA" class="slider" min="1000" max="300000" step="5000" value="120000" oninput="updateParameter('latency_sla_ms', this.value)">
+                <div class="value-display" id="latencySLAValue">120,000 ms (2 minutes)</div>
+            </div>
+
+            <div class="results">
+                <h3>💰 ROI Analysis</h3>
+                <div class="metric">
+                    <span class="metric-label">Current Model:</span>
+                    <span class="metric-value" id="currentModel">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Best Model:</span>
+                    <span class="metric-value" id="bestModel">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Monthly Savings:</span>
+                    <span class="metric-value" id="monthlySavings">₹0</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">ROI:</span>
+                    <span class="metric-value" id="roiPercent">0%</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div class="panel">
+            <h2>🏆 Model Rankings</h2>
+            <div id="modelRankings">
+                <div class="loading">Loading...</div>
+            </div>
+
+            <h3>📝 Recommendation</h3>
+            <div id="finalRecommendation">
+                <div class="loading">Generating recommendation...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentData = null;
+        let updateTimeout = null;
+
+        const API_BASE = 'http://127.0.0.1:8000';
+
+        async function getInitialAnalysis() {
+            const userInput = document.getElementById('userInput').value;
+            if (!userInput.trim()) return;
+
+            document.getElementById('modelRankings').innerHTML = '<div class="loading">Analyzing your requirements...</div>';
+            document.getElementById('finalRecommendation').innerHTML = '<div class="loading">Generating recommendation...</div>';
+
+            try {
+                const response = await fetch(`${API_BASE}/v1/chat/interactive`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        messages: [{ role: 'user', content: userInput }]
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.structured_data) {
+                    currentData = data.structured_data;
+                    document.getElementById('mainInterface').style.display = 'block';
+                    updateUI();
+                    updateSliders();
+                } else {
+                    alert(data.simple_answer || 'Error getting analysis');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error connecting to API. Make sure the server is running.');
+            }
+        }
+
+        async function updateParameter(paramName, value) {
+            if (!currentData) return;
+
+            // Clear existing timeout
+            if (updateTimeout) clearTimeout(updateTimeout);
+
+            // Update the value display
+            updateValueDisplay(paramName, value);
+
+            // Debounce API calls
+            updateTimeout = setTimeout(async () => {
+                const modifiedWorkload = { ...currentData.workload_params };
+                modifiedWorkload[paramName] = parseInt(value);
+
+                try {
+                    const response = await fetch(`${API_BASE}/v1/chat/update-params`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            modified_workload: modifiedWorkload,
+                            original_data: currentData
+                        })
+                    });
+
+                    const data = await response.json();
+                    
+                    if (data.structured_data) {
+                        currentData = data.structured_data;
+                        updateUI();
+                    }
+                } catch (error) {
+                    console.error('Error updating parameter:', error);
+                }
+            }, 500); // 500ms debounce
+        }
+
+        function updateValueDisplay(paramName, value) {
+            const intValue = parseInt(value);
+            let display = '';
+            
+            switch (paramName) {
+                case 'calls_per_day':
+                    display = `${intValue.toLocaleString()} calls/day`;
+                    document.getElementById('callsPerDayValue').textContent = display;
+                    break;
+                case 'avg_input_tokens':
+                    display = `${intValue.toLocaleString()} tokens`;
+                    document.getElementById('inputTokensValue').textContent = display;
+                    break;
+                case 'avg_output_tokens':
+                    display = `${intValue.toLocaleString()} tokens`;
+                    document.getElementById('outputTokensValue').textContent = display;
+                    break;
+                case 'latency_sla_ms':
+                    const seconds = intValue / 1000;
+                    display = seconds >= 60 ? `${Math.round(seconds/60)} minutes` : `${seconds} seconds`;
+                    document.getElementById('latencySLAValue').textContent = `${intValue.toLocaleString()} ms (${display})`;
+                    break;
+            }
+        }
+
+        function updateSliders() {
+            if (!currentData) return;
+            
+            const params = currentData.workload_params;
+            document.getElementById('callsPerDay').value = params.calls_per_day;
+            document.getElementById('inputTokens').value = params.avg_input_tokens;
+            document.getElementById('outputTokens').value = params.avg_output_tokens;
+            document.getElementById('latencySLA').value = params.latency_sla_ms;
+
+            updateValueDisplay('calls_per_day', params.calls_per_day);
+            updateValueDisplay('avg_input_tokens', params.avg_input_tokens);
+            updateValueDisplay('avg_output_tokens', params.avg_output_tokens);
+            updateValueDisplay('latency_sla_ms', params.latency_sla_ms);
+        }
+
+        function updateUI() {
+            if (!currentData) return;
+
+            // Update ROI metrics
+            const roi = currentData.roi_analysis;
+            document.getElementById('currentModel').textContent = roi.current_model || 'None';
+            document.getElementById('bestModel').textContent = roi.best_model;
+            document.getElementById('monthlySavings').textContent = `₹${roi.savings_per_month.toLocaleString()}`;
+            document.getElementById('roiPercent').textContent = `${roi.roi_percent.toFixed(1)}%`;
+
+            // Update model rankings
+            const modelsHtml = currentData.ranked_models.map((model, index) => {
+                const isBest = index === 0;
+                return `
+                    <div class="model-card ${isBest ? 'best-model' : ''}">
+                        <div class="model-name">${isBest ? '🏆 ' : ''}${model.model_name}</div>
+                        <div class="model-cost">₹${model.monthly_cost.toLocaleString()}/month</div>
+                        <div class="model-score">Score: ${model.composite_score.toFixed(2)} | Latency: ${model.p90_latency_ms}ms</div>
+                    </div>
+                `;
+            }).join('');
+            document.getElementById('modelRankings').innerHTML = modelsHtml;
+
+            // Update recommendation
+            document.getElementById('finalRecommendation').innerHTML = `<div style="white-space: pre-line;">${currentData.final_recommendation}</div>`;
+        }
+    </script>
+</body>
+</html> 

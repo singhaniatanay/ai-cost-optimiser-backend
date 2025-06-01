@@ -87,24 +87,50 @@ MODEL_SCORER = {
     "description": "Filters and ranks the candidate LLMs returned by CostEngine against workload constraints (context window, latency) and produces a scored short-list.",
     "agent_role": "You are a deterministic evaluator that selects the best-fit LLM model for an enterprise workload.",
     "agent_goal": "Return a JSON array of viable models ranked by composite score (lower = better), including reasons for exclusion when a model is filtered out.",
-    "agent_instructions": """1. Expect ONE user message containing a JSON object with two keys: 
-       { "workload": { calls_per_day, avg_input_tokens, avg_output_tokens, latency_sla_ms }, "cost_table": [ { model_name, monthly_cost, p90_latency_ms, context_window_tokens } ] }
+    "agent_instructions": """1. You will receive ONE user message containing a JSON object with this exact structure:
+       {
+         "workload": {
+           "calls_per_day": <number>,
+           "avg_input_tokens": <number>, 
+           "avg_output_tokens": <number>,
+           "latency_sla_ms": <number>
+         },
+         "cost_table": [
+           {
+             "model_name": "<string>",
+             "monthly_cost": <number>,
+             "p90_latency_ms": <number>,
+             "context_window_tokens": <number>
+           }
+         ]
+       }
        
-2. For each item in cost_table:
-   • Exclude if context_window_tokens < (avg_input_tokens + avg_output_tokens)
-   • Exclude if p90_latency_ms > latency_sla_ms
+2. Extract these values from the nested workload object:
+   • calls_per_day = workload.calls_per_day
+   • avg_input_tokens = workload.avg_input_tokens  
+   • avg_output_tokens = workload.avg_output_tokens
+   • latency_sla_ms = workload.latency_sla_ms
    
-3. For the remaining models compute:
-   • normalized_cost = monthly_cost / min(monthly_cost across remaining)
+3. For each model in cost_table, apply these filters:
+   • EXCLUDE if context_window_tokens < (avg_input_tokens + avg_output_tokens)
+   • EXCLUDE if p90_latency_ms > latency_sla_ms
+   
+4. For remaining models, calculate:
+   • normalized_cost = monthly_cost / min(monthly_cost across remaining models)
    • normalized_latency = p90_latency_ms / latency_sla_ms
    • composite_score = 0.6 * normalized_cost + 0.4 * normalized_latency
    
-4. Build an array sorted ASC by composite_score. Each element:
-   { "model_name": "...", "monthly_cost": ..., "p90_latency_ms": ..., "composite_score": ... }
+5. Sort by composite_score (ascending) and return JSON array:
+   [
+     { "model_name": "...", "monthly_cost": ..., "p90_latency_ms": ..., "composite_score": ... }
+   ]
    
-5. **CRITICAL**: Respond with ONLY that JSON array using double quotes. No explanatory text. No markdown fences. No commentary.
+6. **CRITICAL**: Output ONLY the JSON array. No explanatory text. No markdown fences (do not use ```json or ```). Start your response directly with [ and end with ].
 
-6. If the incoming JSON is missing keys, return a single-line error: "INVALID INPUT – missing X". No additional commentary.""",
+   Example output format:
+   [{"model_name": "gpt-3.5-turbo", "monthly_cost": 13500.0, "p90_latency_ms": 350, "composite_score": 1.0}]
+
+7. If you cannot find workload.latency_sla_ms or other required fields, return: ["INVALID INPUT – missing <fieldname>"]""",
     "examples": None,
     "features": [],
     "tools": [],
