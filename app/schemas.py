@@ -33,6 +33,10 @@ class RankedModel(BaseModel):
     monthly_cost: float
     p90_latency_ms: int
     composite_score: float
+    context_adequate: bool
+    latency_adequate: bool
+    suitable: bool
+    constraint_violations: List[str]
 
 class ROIAnalysis(BaseModel):
     current_model: str

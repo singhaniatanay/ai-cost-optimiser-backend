@@ -84,9 +84,9 @@ COST_ENGINE = {
 
 MODEL_SCORER = {
     "name": "Model Scorer",
-    "description": "Filters and ranks the candidate LLMs returned by CostEngine against workload constraints (context window, latency) and produces a scored short-list.",
-    "agent_role": "You are a deterministic evaluator that selects the best-fit LLM model for an enterprise workload.",
-    "agent_goal": "Return a JSON array of viable models ranked by composite score (lower = better), including reasons for exclusion when a model is filtered out.",
+    "description": "Ranks all candidate LLMs returned by CostEngine against workload constraints (context window, latency) and produces a complete ranked list with suitability flags.",
+    "agent_role": "You are a deterministic evaluator that ranks ALL LLM models for an enterprise workload and flags any constraints violations.",
+    "agent_goal": "Return a JSON array of ALL models ranked by composite score (lower = better), with flags indicating constraint violations for transparency.",
     "agent_instructions": """1. You will receive ONE user message containing a JSON object with this exact structure:
        {
          "workload": {
@@ -111,24 +111,36 @@ MODEL_SCORER = {
    • avg_output_tokens = workload.avg_output_tokens
    • latency_sla_ms = workload.latency_sla_ms
    
-3. For each model in cost_table, apply these filters:
-   • EXCLUDE if context_window_tokens < (avg_input_tokens + avg_output_tokens)
-   • EXCLUDE if p90_latency_ms > latency_sla_ms
+3. For each model in cost_table, evaluate constraints (DO NOT EXCLUDE ANY MODELS):
+   • context_adequate = context_window_tokens >= (avg_input_tokens + avg_output_tokens)
+   • latency_adequate = p90_latency_ms <= latency_sla_ms
    
-4. For remaining models, calculate:
-   • normalized_cost = monthly_cost / min(monthly_cost across remaining models)
-   • normalized_latency = p90_latency_ms / latency_sla_ms
-   • composite_score = 0.6 * normalized_cost + 0.4 * normalized_latency
+4. For ALL models, calculate composite score:
+   • If both constraints are met: 
+     - normalized_cost = monthly_cost / min(monthly_cost across all models)
+     - normalized_latency = p90_latency_ms / latency_sla_ms
+     - composite_score = 0.6 * normalized_cost + 0.4 * normalized_latency
+   • If constraints are violated:
+     - Add penalty: composite_score = base_score + 10 (to rank them lower)
    
-5. Sort by composite_score (ascending) and return JSON array:
+5. Sort by composite_score (ascending) and return JSON array with ALL models:
    [
-     { "model_name": "...", "monthly_cost": ..., "p90_latency_ms": ..., "composite_score": ... }
+     { 
+       "model_name": "...", 
+       "monthly_cost": ..., 
+       "p90_latency_ms": ..., 
+       "composite_score": ...,
+       "context_adequate": true/false,
+       "latency_adequate": true/false,
+       "suitable": true/false,
+       "constraint_violations": ["context_window_too_small", "latency_too_high"] // empty array if no violations
+     }
    ]
    
 6. **CRITICAL**: Output ONLY the JSON array. No explanatory text. No markdown fences (do not use ```json or ```). Start your response directly with [ and end with ].
 
    Example output format:
-   [{"model_name": "gpt-3.5-turbo", "monthly_cost": 13500.0, "p90_latency_ms": 350, "composite_score": 1.0}]
+   [{"model_name": "gpt-3.5-turbo", "monthly_cost": 13500.0, "p90_latency_ms": 350, "composite_score": 1.0, "context_adequate": true, "latency_adequate": true, "suitable": true, "constraint_violations": []}]
 
 7. If you cannot find workload.latency_sla_ms or other required fields, return: ["INVALID INPUT – missing <fieldname>"]""",
     "examples": None,
