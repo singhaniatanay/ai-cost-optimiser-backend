@@ -174,8 +174,39 @@ class EnterpriseAICostArchitect(BaseAgent):
         if modified_workload and original_data:
             return await self._restart_from_modified_workload(modified_workload, original_data)
         
-        # Otherwise, run full workflow
-        return await self._run_full_workflow_structured(message)
+        # Check for greeting or casual messages first
+        if is_greeting_or_casual_message(str(message)):
+            logger.info("Detected greeting/casual message - returning service introduction")
+            return StructuredResponse(
+                solution_architect=None,
+                workload_params=None,
+                cost_table=None,
+                ranked_models=None,
+                roi_analysis=None,
+                final_recommendation=generate_service_introduction()
+            )
+        
+        # Otherwise, run full workflow with proper error handling
+        try:
+            return await self._run_full_workflow_structured(message)
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"Interactive workflow error: {error_msg}")
+            
+            # Return helpful guidance for various error scenarios
+            if any(error_type in error_msg.lower() for error_type in ["invalid input", "failed to parse", "validation failed", "empty response"]):
+                guidance_msg = generate_helpful_guidance()
+            else:
+                guidance_msg = generate_helpful_guidance()
+            
+            return StructuredResponse(
+                solution_architect=None,
+                workload_params=None,
+                cost_table=None,
+                ranked_models=None,
+                roi_analysis=None,
+                final_recommendation=guidance_msg
+            )
     
     async def _restart_from_modified_workload(self, modified_workload: dict, original_data: dict) -> StructuredResponse:
         """Restart workflow from cost engine with modified workload parameters."""
@@ -188,10 +219,38 @@ class EnterpriseAICostArchitect(BaseAgent):
             logger.info(f"Cost table generated: {len(cost_table)} models")
         except InvalidInputError as e:
             logger.error(f"CostEngine error: {e}")
-            raise Exception("Invalid workload parameters")
+            return StructuredResponse(
+                solution_architect=None,
+                workload_params=None,
+                cost_table=None,
+                ranked_models=None,
+                roi_analysis=None,
+                final_recommendation=generate_helpful_guidance()
+            )
+        except Exception as e:
+            logger.error(f"CostEngine unexpected error: {e}")
+            return StructuredResponse(
+                solution_architect=None,
+                workload_params=None,
+                cost_table=None,
+                ranked_models=None,
+                roi_analysis=None,
+                final_recommendation=generate_helpful_guidance()
+            )
         
         # Continue with STEP 3-5 using new cost table
-        return await self._run_from_model_scorer(modified_workload, cost_table, original_data.get("solution_architect"))
+        try:
+            return await self._run_from_model_scorer(modified_workload, cost_table, original_data.get("solution_architect"))
+        except Exception as e:
+            logger.error(f"Error in model scorer workflow: {e}")
+            return StructuredResponse(
+                solution_architect=original_data.get("solution_architect"),
+                workload_params=WorkloadParams(**modified_workload) if modified_workload else None,
+                cost_table=[CostModel(**model) for model in cost_table] if cost_table else None,
+                ranked_models=None,
+                roi_analysis=None,
+                final_recommendation=generate_helpful_guidance()
+            )
     
     async def _run_from_model_scorer(self, validated_workload: dict, cost_table: list, solution_architect_data: dict = None) -> StructuredResponse:
         """Run from Model Scorer step onwards."""
@@ -200,15 +259,26 @@ class EnterpriseAICostArchitect(BaseAgent):
         scorer_payload = {"workload": validated_workload, "cost_table": cost_table}
         scorer_input = json.dumps(scorer_payload)
         
-        scorer_response = await self.model_scorer.run(scorer_input)
-        ranked_models = extract_json_from_text(scorer_response)
-        
-        # Validate ranked_models
-        if not isinstance(ranked_models, list) or not ranked_models:
-            raise Exception("Model Scorer returned invalid data")
-        
-        if isinstance(ranked_models[0], str) and "INVALID INPUT" in ranked_models[0]:
-            raise Exception(f"Model Scorer error: {ranked_models[0]}")
+        try:
+            scorer_response = await self.model_scorer.run(scorer_input)
+            ranked_models = extract_json_from_text(scorer_response)
+            
+            # Validate ranked_models
+            if not isinstance(ranked_models, list) or not ranked_models:
+                raise Exception("Model Scorer returned invalid data")
+            
+            if isinstance(ranked_models[0], str) and "INVALID INPUT" in ranked_models[0]:
+                raise Exception(f"Model Scorer error: {ranked_models[0]}")
+        except Exception as e:
+            logger.error(f"Model Scorer error: {e}")
+            return StructuredResponse(
+                solution_architect=solution_architect_data,
+                workload_params=WorkloadParams(**validated_workload),
+                cost_table=[CostModel(**model) for model in cost_table],
+                ranked_models=None,
+                roi_analysis=None,
+                final_recommendation=generate_helpful_guidance()
+            )
         
         # STEP 4: ROI Calculator
         roi_payload = {
@@ -220,7 +290,15 @@ class EnterpriseAICostArchitect(BaseAgent):
         try:
             roi_report = await roi_calc.run(roi_payload)
         except Exception as e:
-            raise Exception(f"ROI Calculator error: {e}")
+            logger.error(f"ROI Calculator error: {e}")
+            return StructuredResponse(
+                solution_architect=solution_architect_data,
+                workload_params=WorkloadParams(**validated_workload),
+                cost_table=[CostModel(**model) for model in cost_table],
+                ranked_models=[RankedModel(**model) for model in ranked_models],
+                roi_analysis=None,
+                final_recommendation=generate_helpful_guidance()
+            )
         
         # STEP 5: Recommendation Synthesizer
         final_payload = {
@@ -230,9 +308,21 @@ class EnterpriseAICostArchitect(BaseAgent):
             "roi": roi_report
         }
         final_input = json.dumps(final_payload)
-        final_response = await self.recommender.run(final_input)
         
-        # Build structured response
+        try:
+            final_response = await self.recommender.run(final_input)
+        except Exception as e:
+            logger.error(f"Recommendation Synthesizer error: {e}")
+            return StructuredResponse(
+                solution_architect=solution_architect_data,
+                workload_params=WorkloadParams(**validated_workload),
+                cost_table=[CostModel(**model) for model in cost_table],
+                ranked_models=[RankedModel(**model) for model in ranked_models],
+                roi_analysis=ROIAnalysis(**roi_report),
+                final_recommendation=generate_helpful_guidance()
+            )
+        
+        # Build successful structured response
         return StructuredResponse(
             solution_architect=solution_architect_data,
             workload_params=WorkloadParams(**validated_workload),
@@ -244,10 +334,6 @@ class EnterpriseAICostArchitect(BaseAgent):
     
     async def _run_full_workflow_structured(self, message: Any) -> StructuredResponse:
         """Run full workflow and return structured data."""
-        
-        # Check for greeting - this should return simple answer, not structured
-        if is_greeting_or_casual_message(str(message)):
-            raise Exception("GREETING_DETECTED")  # Signal to return simple answer
         
         solution_architect_data = None
         
