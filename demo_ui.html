@@ -79,6 +79,14 @@
             margin: 8px 0;
             background: #f9f9f9;
         }
+        .model-card.suitable {
+            border-color: #28a745;
+            background: #f8fff9;
+        }
+        .model-card.not-suitable {
+            border-color: #dc3545;
+            background: #fff8f8;
+        }
         .model-name {
             font-weight: 600;
             color: #333;
@@ -91,6 +99,26 @@
         .model-score {
             color: #666;
             font-size: 12px;
+        }
+        .constraint-flags {
+            margin-top: 8px;
+            font-size: 11px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .constraint-flag {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+        .constraint-flag.ok {
+            background: #d4edda;
+            color: #155724;
+        }
+        .constraint-flag.violation {
+            background: #f8d7da;
+            color: #721c24;
         }
         .loading {
             text-align: center;
@@ -330,12 +358,35 @@
 
             // Update model rankings
             const modelsHtml = currentData.ranked_models.map((model, index) => {
-                const isBest = index === 0;
+                const isBest = index === 0 && model.suitable;
+                const suitabilityClass = model.suitable ? 'suitable' : 'not-suitable';
+                
+                // Generate constraint flags
+                const constraintFlags = [];
+                if (model.context_adequate) {
+                    constraintFlags.push('<span class="constraint-flag ok">✅ Context OK</span>');
+                } else {
+                    constraintFlags.push('<span class="constraint-flag violation">❌ Context Too Small</span>');
+                }
+                
+                if (model.latency_adequate) {
+                    constraintFlags.push('<span class="constraint-flag ok">✅ Latency OK</span>');
+                } else {
+                    constraintFlags.push('<span class="constraint-flag violation">❌ Latency Too High</span>');
+                }
+                
+                if (model.constraint_violations && model.constraint_violations.length > 0) {
+                    constraintFlags.push('<span class="constraint-flag violation">⚠️ ' + model.constraint_violations.join(', ') + '</span>');
+                }
+                
                 return `
-                    <div class="model-card ${isBest ? 'best-model' : ''}">
-                        <div class="model-name">${isBest ? '🏆 ' : ''}${model.model_name}</div>
+                    <div class="model-card ${isBest ? 'best-model' : ''} ${suitabilityClass}">
+                        <div class="model-name">${isBest ? '🏆 ' : ''}${model.model_name}${model.suitable ? '' : ' (Not Suitable)'}</div>
                         <div class="model-cost">₹${model.monthly_cost.toLocaleString()}/month</div>
                         <div class="model-score">Score: ${model.composite_score.toFixed(2)} | Latency: ${model.p90_latency_ms}ms</div>
+                        <div class="constraint-flags">
+                            ${constraintFlags.join('')}
+                        </div>
                     </div>
                 `;
             }).join('');
